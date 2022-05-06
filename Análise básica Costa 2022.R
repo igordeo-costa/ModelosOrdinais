@@ -10,6 +10,8 @@ require(sjPlot) # Fundamental para extrair os efeitos marginais (última etapa d
 
 # Carregando os dados
 
+dados <- read.csv("https://raw.githubusercontent.com/igordeo-costa/ModelosOrdinais/main/ScalaLikertCosta2022.csv")
+
 # Análise do experimento Escala Likert
 
 # Transformando as variáveis de modo adequado
@@ -227,3 +229,69 @@ model_data %>%
           subtitle = "Linhas verticais indicam intervalos de credibilidade preditos.")+ 
   theme_classic()+
   guides(colour = guide_legend(reverse=T)) # Apenas organizando a ordem da legenda.
+
+
+################################################################################
+# AJUSTANDO UM MODELO COM PRIORS ESPECÍFICAS
+################################################################################
+# Referência aqui sobre get_prior
+# https://paul-buerkner.github.io/brms/reference/get_prior.html
+# Apenas indica as priors possíveis para cada parámetro do modelo a ser aplicado
+get_prior(answer ~ Ordem*Num + (1+Ordem*Num|subj)+(1+Ordem*Num|item), data = dados,
+          family = cumulative(link = "logit", threshold = "flexible"))
+
+# Referência aqui sobre set_prior
+# Define priors manualmente
+# https://paul-buerkner.github.io/brms/reference/set_prior.html
+
+# Ver Burkner & Vuorre (2019), p. 90 (só chupei o exemplo de lá sem nem pensar a respeito)
+prior_manual <-
+  prior(normal(0, 5), class = "b") + # Assume distribuição normal com média 0 e desvio padrão 5 para todos os coeficientes estimados (b de beta)
+  prior(normal(0, 5), class = "Intercept") # Assume distribuição normal com média 0 e desvio padrão 5 para os interceptos (nesse caso tau cuts)
+
+m3 <- brm(answer ~ Ordem*Num + (1+Ordem*Num|subj)+(1+Ordem*Num|item), data = dados,
+          family = cumulative(link = "logit", threshold = "flexible"), # Probit não está funcionando... Não sei o motivo...
+          prior = prior_manual) 
+
+summary(m3)
+
+################################################################################
+# Montando o gráfico dos efeitos marginais
+################################################################################
+model3_data<-get_model_data(m3,
+                           type = "pred",
+                           terms = c("Ordem", "Num"),
+                           ci.lvl = .95)
+
+model3_data<-data.frame(ordem = model3_data$x,
+                       num = model3_data$group,
+                       Respostas = model3_data$response.level,
+                       Probabilidades = model3_data$predicted,
+                       lower = model3_data$conf.low,
+                       upper = model3_data$conf.high)
+
+model3_data$ordem<-c(rep("um-todo", 10), rep("todo-um", 10))
+
+model3_data$ordem<-as.factor(model3_data$ordem)
+
+# Preparar uma paleta de cores condizente com a paleta usada no gráfico de barras empilhadas
+paleta<-c("#D7191C", "#FDAE61", "#9C9C9C", "#ABDDA4", "#2B83BA")
+
+model3_data %>%
+  ggplot(aes(x=num, y=Probabilidades, group=Respostas, color=Respostas))+ # x = ordem ou num
+  geom_line(position = position_dodge(0.3), alpha = 0.3, linetype = "dotted") +
+  geom_errorbar(aes(ymin=lower, ymax=upper),
+                width=0.2, position = position_dodge(0.3), alpha=0.3)+
+  geom_point(position = position_dodge(0.3), size = 3, shape = 21, fill = "white", stroke = 1) +
+  facet_wrap(~ordem)+ # num ou ordem
+  scale_y_continuous(breaks = seq(from = 0, to = 1.0, by = 0.1),
+                     labels = scales::label_percent(accuracy = 1))+
+  scale_colour_manual(values=paleta,
+                      labels=c("Discordo_Totalmente", "Discordo", "Neutro", "Concordo", "Concordo_Totalmente"))+
+  labs(x = "Número da anáfora", y = "Probabilidades preditas\n", fill="Respostas")+ 
+  ggtitle("Painel 2: Previsão de probabilidades estimada pelo modelo",
+          subtitle = "Linhas verticais indicam intervalos de credibilidade preditos.")+ 
+  theme_classic()+
+  guides(colour = guide_legend(reverse=T)) # Apenas organizando a ordem da legenda.
+
+# Observe que, como as minhas priors são completamente sem sentido, as estimativas do modelo também são loucas!!!
