@@ -42,7 +42,7 @@ colnames(contag) <- c("Ordem", "Num", "Discordo_Totalmente", "Discordo", "Neutro
 porc_horiz <- dados %>%
   group_by(Ordem, Num, answer) %>%
   tally() %>%
-  mutate(perc=n/sum(n)*100) %>%
+  mutate(perc=n/sum(n)) %>%
   dplyr::select(-n) %>%
   group_by(Ordem, Num) %>%
   spread(answer, perc)
@@ -84,8 +84,8 @@ ggplot() +
   geom_bar(data = meio_baixo, aes(x = Num, y=-perc, fill = answer), stat="identity") + 
   geom_hline(yintercept = 0, color =c("black")) +
   facet_wrap(~Ordem) +
-  scale_y_continuous(breaks = seq(from = -100, to = 100, by = 10),
-                     labels = scales::number_format(accuracy = 1)) +
+  scale_y_continuous(breaks = seq(from = -1, to = 1, by = .1),
+                     labels = function(x) percent(abs(x))) + # Definir os valores negativos da legenda como positivos
   scale_fill_manual(values = legend_pal, 
                     breaks = c("Concordo_Totalmente", "Concordo", "c2", "Discordo", "Discordo_Totalmente"),
                     labels = c("Concordo_Totalmente", "Concordo", "Neutro", "Discordo", "Discordo_Totalmente")) +
@@ -113,13 +113,15 @@ dados$Ordem<-relevel(dados$Ordem, ref = "um-todo")
 # Há 3 modelos abaixo. Vamos rodar apenas o mais completo, pois demora um pouco
 
 #m<-brm(answer ~ Ordem*Num + (1|subj) + (1|item), data= dados,
-#       family = cumulative("logit", threshold = "flexible"))
+#       family = cumulative("probit", threshold = "flexible")) # Esse roda com probit
 #m1 <- brm(answer ~ Ordem*Num + (1+Ordem*Num|subj)+(1|item), data = dados,
-#          family = cumulative("logit", threshold = "flexible"))
+#          family = cumulative("probit", threshold = "flexible")) # Roda com probit, mas com avisos...
 m2 <- brm(answer ~ Ordem*Num + (1+Ordem*Num|subj)+(1+Ordem*Num|item), data = dados,
-          family = cumulative(link = "logit", threshold = "flexible")) # Probit não está funcionando... Não sei o motivo...
+          family = cumulative(link = "logit", threshold = "flexible")) # Esse não roda com probit... Não sei o motivo...
 
 summary(m2)
+
+pp_check(m2, ndraws = 100)
 
 ################################################################################
 # INÍCIO DO CÓDIGO PARA FEITURA DE GRÁFICO OPCIONAL COM AS ESTIMATIVAS
@@ -152,21 +154,78 @@ fixos.m %>%
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey")+
   geom_errorbar(aes(ymin=lower, ymax=upper), width=.0,
                 position=position_dodge(.9))+
-  geom_point(color="orange")+
+  geom_point(color="orange", size = 3)+
   geom_text(aes(label=round(Estimativas, 3)), vjust=-1)+
-  scale_x_discrete(labels=c("ORDEM: todo_um", "NÚMERO: Singular", "INTERAÇÃO: ordem x número"))+ # ao mudar a ordem é preciso mudar aqui
+  scale_x_discrete(labels=c("ORDEM: todo_um", "NÚMERO: Singular", "INTERAÇÃO:\n\ntodo_um x singular"))+ # ao mudar a ordem é preciso mudar aqui
   labs(y = "LogOdds", x = "") + 
   ggtitle("Painel 1: Estimativas e intervalos de credibilidade (0.95)",
           subtitle = "Intervalos que não contêm zero são estatisticamente significativos") +
   coord_flip()+theme_classic()
 
-# Interpretando: confesso que isso é muito difícil
-# Não sei interpretar esses coeficientes
+# Interpretando...
 
-# Intercepto: um_todo PL
-# Ordem: todo_um (SG) x um_todo PL (intercepto): ???
-# num: (um_todo) SG x um_todo PL (intercepto): ???
-# Interação: ???
+# Primeiro, devemos lembrar o contrastes do modelo.
+# Neste caso estamos usando dummy code (0 e 1)
+contrasts(dados$Num)
+contrasts(dados$Ordem)
+
+# As categorias codificadas com 0 (zero) formam a base contra as quais as demais serão contrastadas:
+# Neste caso, um_todo (0) PL (0)
+
+# O preditor Ordem: todo_um: -2.47 logOdds indica o contraste todo_um (1) PL (0) x um_todo (0) PL (0)
+# Ou seja, mantendo-se o número constante, o efeito da ordem: todo_um aumenta a probabilidade de se DESCER na escala
+
+# O preditor Número: singular: +1.62 logOdds indica o contraste um_todo (0) SG (1) x um_todo (0) PL (0)
+# Ou seja, mantendo-se a ordem constante, o efeito do número: singular aumenta a probabilidade de se SUBIR na escala
+
+# A interação Ordem x Número (todo_um singular): +1.66 logOdds indica que:
+# Os níveis da variável Ordem interagem com os níveis da variável Número
+# Basicamente:
+# o nível singular aumenta a probabilidade de SUBIR na escala com todo_um
+# o nível plural aumenta a probabilidade de DESCER na escala com todo_um
+
+# IMPORTANTE!
+# O fato de haver um efeito de interação aponta para olharmos com cuidado para os efeitos de Ordem e de Número
+# Se não houvesse interação, o efeito de um nível da variável seria o mesmo para ambos os níveis da outra
+# Ver explicação abaixo, se quiser saber mais.
+
+################################################################################
+# Explicação simples do efeito de interação
+################################################################################
+# Valores abaixo são inventados, apenas para ilustração
+data.frame(.ordem = c("um_todo", "um_todo", "todo_um", "todo_um"),
+.num = c("sg", "pl", "sg", "pl"),
+.porc = c(.8, .6, .7, .5), # Troque o .2 (quando há interação) por .5 (quando não há interação) e compare os dois gráficos
+.sd = c(rep(.02, 4))) %>%
+  ggplot(aes(x = .ordem, y = .porc, group = .num, color = .num)) +
+  geom_errorbar(aes(ymin = .porc-.sd, ymax = .porc+.sd), width = .05) +
+  geom_point(size = 4) + geom_line() +
+  scale_y_continuous(labels = scales::label_percent(accuracy = 1L),
+                     breaks = seq(from = 0, to = 1, by = .1))
+
+# Mudar de plural para singular (ou vice-versa):
+# Quando a ordem é um_todo, a mudança é de 20% (80 - 60)
+# Quando a ordem é todo_um, a mudança é de 50% (70 - 20)
+
+# Mudar de um_todo para todo_um (ou vice-versa):
+# Quando o número é singular, a mudança é de 10% (80 - 70)
+# Quando o número é plural, a mudança é de 40% (60 - 20)
+
+# Observe que o "efeito de interação" é sempre o mesmo: 30%
+# 50 - 20 = 30
+# 40 - 10 = 30
+# Por isso, não importa o modelo que você ajuste para esses dados...
+# ...com quaisquer contrastes o valor da interação será o mesmo!
+
+# Se você mudou o .2 para .5 no exemplo acima, viu que:
+# Mudar de plural para singular não é afetado pela ordem, que é 20% em ambos os casos (20 - 20 = 0% de alteração de um nível para outro)
+# Mudar de um_todo para todo_um não é afetado pelo número, que é 10% em ambos os casos (10 - 10 = 0% de alteração de um nível para outro)
+# Logo: não há efeito de interação!
+################################################################################
+# Fim da explicação simples do efeito de interação
+################################################################################
+
+
 
 # Por isso acho importante extrair os efeitos marginais
 ################################################################################
@@ -214,22 +273,29 @@ paleta<-c("#D7191C", "#FDAE61", "#9C9C9C", "#ABDDA4", "#2B83BA")
 # and without credible intervals.
 
 model_data %>%
-  ggplot(aes(x=num, y=Probabilidades, group=Respostas, color=Respostas))+ # x = ordem ou num
+  ggplot(aes(x=ordem, y=Probabilidades, group=Respostas, color=Respostas))+ # x = ordem ou num
   geom_line(position = position_dodge(0.3), alpha = 0.3, linetype = "dotted") +
   geom_errorbar(aes(ymin=lower, ymax=upper),
                 width=0.2, position = position_dodge(0.3), alpha=0.3)+
   geom_point(position = position_dodge(0.3), size = 3, shape = 21, fill = "white", stroke = 1) +
-  facet_wrap(~ordem)+ # num ou ordem
+  facet_wrap(~num)+ # num ou ordem
   scale_y_continuous(breaks = seq(from = 0, to = 1.0, by = 0.1),
                      labels = scales::label_percent(accuracy = 1))+
   scale_colour_manual(values=paleta,
                       labels=c("Discordo_Totalmente", "Discordo", "Neutro", "Concordo", "Concordo_Totalmente"))+
-  labs(x = "Número da anáfora", y = "Probabilidades preditas\n", fill="Respostas")+ 
+  labs(x = "\nOrdem dos Quantificadores", y = "Probabilidades preditas\n", fill="Respostas")+ 
   ggtitle("Painel 2: Previsão de probabilidades estimada pelo modelo",
           subtitle = "Linhas verticais indicam intervalos de credibilidade preditos.")+ 
   theme_classic()+
   guides(colour = guide_legend(reverse=T)) # Apenas organizando a ordem da legenda.
 
+
+# Observação
+# Esse comando plota os mesmos valores acima, mas num formato diferente e, a meu ver, não tão prático
+plot_model(m2, type = "pred", terms = c("Num", "Ordem"))
+
+# Pode-se plotar, ainda, a distribuição de cada um dos coeficientes estimados
+plot(m2)
 
 ################################################################################
 # AJUSTANDO UM MODELO COM PRIORS ESPECÍFICAS
@@ -246,14 +312,17 @@ get_prior(answer ~ Ordem*Num + (1+Ordem*Num|subj)+(1+Ordem*Num|item), data = dad
 
 # Ver Burkner & Vuorre (2019), p. 90 (só chupei o exemplo de lá sem nem pensar a respeito)
 prior_manual <-
-  prior(normal(0, 5), class = "b") + # Assume distribuição normal com média 0 e desvio padrão 5 para todos os coeficientes estimados (b de beta)
-  prior(normal(0, 5), class = "Intercept") # Assume distribuição normal com média 0 e desvio padrão 5 para os interceptos (nesse caso tau cuts)
+  prior(normal(0, 0.1), class = "b") + # Assume distribuição normal com média 0 e desvio padrão 5 para todos os coeficientes estimados (b de beta)
+  prior(normal(0, 1.5), class = "Intercept") # Assume distribuição normal com média 0 e desvio padrão 5 para os interceptos (nesse caso tau cuts)
 
 m3 <- brm(answer ~ Ordem*Num + (1+Ordem*Num|subj)+(1+Ordem*Num|item), data = dados,
           family = cumulative(link = "logit", threshold = "flexible"), # Probit não está funcionando... Não sei o motivo...
-          prior = prior_manual) 
+          prior = prior_manual,
+          sample_prior = "only") 
 
 summary(m3)
+
+pp_check(m3, ndraws = 100)
 
 ################################################################################
 # Montando o gráfico dos efeitos marginais
@@ -278,12 +347,12 @@ model3_data$ordem<-as.factor(model3_data$ordem)
 paleta<-c("#D7191C", "#FDAE61", "#9C9C9C", "#ABDDA4", "#2B83BA")
 
 model3_data %>%
-  ggplot(aes(x=num, y=Probabilidades, group=Respostas, color=Respostas))+ # x = ordem ou num
+  ggplot(aes(x=ordem, y=Probabilidades, group=Respostas, color=Respostas))+ # x = ordem ou num
   geom_line(position = position_dodge(0.3), alpha = 0.3, linetype = "dotted") +
   geom_errorbar(aes(ymin=lower, ymax=upper),
                 width=0.2, position = position_dodge(0.3), alpha=0.3)+
   geom_point(position = position_dodge(0.3), size = 3, shape = 21, fill = "white", stroke = 1) +
-  facet_wrap(~ordem)+ # num ou ordem
+  facet_wrap(~num)+ # num ou ordem
   scale_y_continuous(breaks = seq(from = 0, to = 1.0, by = 0.1),
                      labels = scales::label_percent(accuracy = 1))+
   scale_colour_manual(values=paleta,
