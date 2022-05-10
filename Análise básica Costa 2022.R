@@ -81,16 +81,31 @@ point <- format_format(big.mark = " ", decimal.mark = ",", scientific = FALSE)
 # produzindo o gráfico, finalmente!
 ggplot() + 
   geom_bar(data = meio_alto, aes(x = Num, y=perc, fill = answer), stat="identity") +
-  geom_bar(data = meio_baixo, aes(x = Num, y=-perc, fill = answer), stat="identity") + 
-  geom_hline(yintercept = 0, color =c("black")) +
+  geom_bar(data = meio_baixo, aes(x = Num, y=-perc, fill = answer), stat="identity") +
+  #-----------------------------------------------------------------------------
+  # Essa parte do código é um pouco complicada... Serve apenas para colocar os valores dentro das barras
+  geom_text(data = meio_alto,
+            aes(alpha = answer, x = Num, y=perc, group = answer, label = scales::percent(perc, accuracy = 1)),
+            color = "white",
+            size = 3.5, position = position_stack(vjust = .5),
+            fontface = "bold") +
+  geom_text(data = meio_baixo,
+            aes(alpha = answer, x = Num, y=-perc, group = answer, label = scales::percent(perc, accuracy = 1)),
+            size = 3.5, position = position_stack(vjust = .5),
+            color = "white",
+            fontface = "bold") +
+  scale_alpha_manual(values = c("c1" = 0, "c2" = 0, "Discordo" = 1, "Discordo_Totalmente" = 1,
+                                "Concordo_Totalmente" = 1, "Concordo" = 1), guide = 'none') +
+  #-----------------------------------------------------------------------------
+  geom_hline(yintercept = 0, color =c("black"), linetype = "dotted") +
   facet_wrap(~Ordem) +
-  scale_y_continuous(breaks = seq(from = -1, to = 1, by = .1),
+  scale_y_continuous(breaks = seq(from = -1, to = 1, by = .2),
                      labels = function(x) percent(abs(x))) + # Definir os valores negativos da legenda como positivos
   scale_fill_manual(values = legend_pal, 
                     breaks = c("Concordo_Totalmente", "Concordo", "c2", "Discordo", "Discordo_Totalmente"),
                     labels = c("Concordo_Totalmente", "Concordo", "Neutro", "Discordo", "Discordo_Totalmente")) +
   #coord_flip() +
-  labs(x = "", y = "Porcentagem de Respostas (%)\n", fill = "Respostas") + 
+  labs(x = "\nNúmero da Anáfora", y = "Porcentagem de Respostas (%)\n", fill = "Respostas") + 
   ggtitle("Painel 1: Distribuição percentual dos julgamentos na amostra",
           subtitle = "Barras empilhadas somam 100% cada") + 
   theme_classic()
@@ -454,8 +469,23 @@ ggplot() +
   geom_bar(data = meio_alto, aes(x = Cond,
                                  y=perc, fill = Escolha), stat="identity") +
   geom_bar(data = meio_baixo, aes(x = Cond,
-                                  y=-perc, fill = Escolha), stat="identity") + 
-  geom_hline(yintercept = 0, color = c("black"), linetype = "dashed") +
+                                  y=-perc, fill = Escolha), stat="identity") +
+  #-----------------------------------------------------------------------------
+# Essa parte do código é um pouco complicada... Serve apenas para colocar os valores dentro das barras
+geom_text(data = meio_alto,
+          aes(alpha = Escolha, x = Cond, y=perc, group = Escolha, label = scales::percent(perc, accuracy = 1)),
+          color = "white",
+          size = 3.5, position = position_stack(vjust = .5),
+          fontface = "bold") +
+  geom_text(data = meio_baixo,
+            aes(alpha = Escolha, x = Cond, y=-perc, group = Escolha, label = scales::percent(perc, accuracy = 1)),
+            size = 3.5, position = position_stack(vjust = .5),
+            color = "white",
+            fontface = "bold") +
+  scale_alpha_manual(values = c("c1" = 0, "c2" = 0, "Muito_natural" = 1, "Totalmente_natural" = 1,
+                                "Nada_natural" = 1, "Pouco_natural" = 1), guide = 'none') +
+  #-----------------------------------------------------------------------------
+  geom_hline(yintercept = 0, color = c("black"), linetype = "dotted") +
   scale_fill_manual(values = legend_pal, 
                     breaks = c("Totalmente_natural", "Muito_natural", "c2", "Pouco_natural", "Nada_natural"),
                     labels = c("Totalmente_natural", "Muito_natural", "Neutro", "Pouco_natural", "Nada_natural")) +
