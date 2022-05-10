@@ -319,6 +319,20 @@ get_prior(answer ~ Ordem*Num + (1+Ordem*Num|subj)+(1+Ordem*Num|item), data = dad
 # https://paul-buerkner.github.io/brms/reference/set_prior.html
 
 # Ver Burkner & Vuorre (2019), p. 90 (só chupei o exemplo de lá sem nem pensar a respeito)
+
+################################################################################
+# COMENTÁRIOS DA ANA:
+# é importante colocar as priors na mesma escala do output. Por exemplo:
+# - Se for ms, usar (400, 150)
+# - se for log(ms), usar (0.6, ...)
+# - se for logOdds, usar logOdds ...aí o melhor seria pensar nas porcentagens e calcular as logOdds.
+# No caso abaixo, as priors estão em unidades não adequadas, portanto!
+
+# A distribuição normal é a melhor para descrever dados ordinais?
+# No brm vc tem a vantagem de escolher a distribuição mais adequada para o tipo de dado.
+# Nas linhas 322 a 324, acho que a normal não é a melhor opção, mas não sei qual é a distribuição dos dados ordinais:
+# Ver: https://rdrr.io/cran/brms/man/brmsfamily.html
+################################################################################
 prior_manual <-
   prior(normal(0, 5), class = "b") + # Assume distribuição normal com média 0 e desvio padrão 5 para todos os coeficientes estimados (b de beta)
   prior(normal(0, 5), class = "Intercept") # Assume distribuição normal com média 0 e desvio padrão 5 para os interceptos (nesse caso tau cuts)
@@ -520,6 +534,16 @@ contrasts(final_table$Número)
 
 # Intervalos de credibilidade interceptando a linha do zero indicam que esses fatores não são significativos
 
+#################################################################################
+# COMENTÁRIO DA ANA:
+# Polêmica! O Vasishth disse que isso não pode ser considerado uma regra por inúmeros motivos
+# que ele demonstrou em sala e não lembro. Ele disse que ia escrever sobre isso rs!
+# Mas é mais uma daquelas verdades reproduzidas em materiais didáticos que não têm fundamento.
+# Essa pergunta surgiu de um aluno que apontou para um material do estatístico que dizia exatamente
+# o que está na linha 535. No final, o Vasishth escreveu para os autores argumentando que a afirmação
+# não é correta e pediu para eles consertarem ou modalizarem a afirmação sem generalizá-la
+#################################################################################
+
 # O fator significativo número singular (+6.24 logOdds) indica que:
 # Curta (0) sg (1) x Curta (0) pl (0): singular aumenta a chance de se SUBIR na escala...
 
@@ -536,7 +560,7 @@ contrasts(final_table$Número)
 # Valores abaixo são inventados, apenas para ilustração
 data.frame(.tamanho = c("curta", "curta", "longa", "longa"),
            .num = c("sg", "pl", "sg", "pl"),
-           .porc = c(.8, .55, .65, .55),
+           .porc = c(.8, .55, .65, .55), # Para ficar sem interação, basta mudar o segundo .55 para .7
            .sd = c(rep(.02, 4))) %>%
   ggplot(aes(x = .tamanho, y = .porc, group = .num, color = .num)) +
   geom_line() +
