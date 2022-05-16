@@ -18,7 +18,8 @@ Mais especificamente:
 
 Veja também: 
 
-\href{https://vasishth.github.io/bayescogsci/book/}{Nicenboim, B., Schad, D. \& Vasishth, S. An Introduction to Bayesian Data Analysis for Cognitive Science.}
+- \href{https://vasishth.github.io/bayescogsci/book/}{Nicenboim, B., Schad, D. \& Vasishth, S. An Introduction to Bayesian Data Analysis for Cognitive Science.}
+- \href{https://bookdown.org/content/3686/ordinal-predicted-variable.html}{Cap. 23 - Ordinal Predicted Variable. In. Kurz, S. Doing Bayesian Data Analysis in brms and the tidyverse.}
 
 Carregando os pacotes adequados
 ```{r, message=FALSE}
@@ -215,6 +216,9 @@ pp_check(m2, ndraws = 100)
 
 # Investigue também no formato de barras, se desejar
 # pp_check(m2, type = "bars", ndraws = 100)
+
+# Você pode investigar, inclusive, por groupo: 
+pp_check(m2, type = "bars_grouped", ndraws = 100, group = "Ordem")
 ```
 
 ## Visualizando as estimativas
@@ -227,7 +231,7 @@ fixos.m<-fixef(m2)[5:7,]
 colnames(fixos.m)<-c("Estimativas", "Est.Error", "lower", "upper")
 fixos.m<-as.data.frame(fixos.m)
 
-# Calcula da razão de chance e das probabilidades correspondentes
+# Calcula da chance e das probabilidades correspondentes
 fixos.m<-fixos.m %>%
   mutate(OddsRatio=exp(Estimativas)) %>%
   mutate(Probs=OddsRatio/(1 + OddsRatio)*100)
@@ -254,6 +258,31 @@ fixos.m %>%
   ggtitle("Intervalos de credibilidade (0.95)") +
   coord_flip()+theme_classic()
 ``` 
+
+Uma outra forma de pensar sobre esse gráfico é olhar para a relação entre a distribuição das estimativas dos fatores fixos\footnote{Modelos bayesianos apresentam uma série de estimativas para os valores de sigma, de modo que aqui, apenas a título de ilustração, usamos o intervalo de confiança calculado a partir do Erro padrão como a variância da curva.} e os interceptos (tau-cuts $\tau$) estimados pelo modelo: 
+```{r, fig.width=5, fig.height=3}
+tibble(
+  fatores = c("Todo_um", "Singular", "Interação"),
+  mu = fixef(m2)[5:7, 1], # Estimativas do modelo
+  ci = 1.96*fixef(m2)[5:7, 2]) %>% # Erro padrão x 1.96 (ci = .95)
+  expand(nesting(fatores, mu, ci),
+         y = seq(from = -5, to = 5, by = .01)) %>%
+         mutate(d = dnorm(y, mu, ci)) %>%
+  ggplot(aes(x = y, y = d, fill = fatores)) +
+  geom_area(alpha = 0.4, position = "identity") +
+  geom_vline(xintercept = fixef(m2)[1:4, 1], linetype = "dotted") +
+  scale_x_continuous(sec.axis = dup_axis(breaks = fixef(m2)[1:4, 1] %>%
+                                           as.double(),
+                                         labels = parse(text = stringr::str_c("tau[", 1:4, "]")))) +
+  labs(y = "", x = "", fill = "") +
+  theme_bw() +
+  theme(axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_blank(),
+        plot.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank())
+```
 
 ## Interpretando os resultados...
 
@@ -287,7 +316,7 @@ print(a)
 
 Agora vamos transformar esse valor em chance:
 ```{r}
-# Odds ou razão de chance
+# Odds ou chances
 round(exp(a), 1)
 ```
 E, por fim, vamos retornar às probabilidades:
@@ -312,7 +341,7 @@ qlogis(.9999999999) # um valor muito próximo de 100% pode ser estimado em logOd
 qlogis(.0000000001) # um valor muito próximo de 0% pode ser estimado em logOdds
 ```
 
-Assim sendo, uma outra maneira de ler as estimativas do modelo é, grosseiramente, interpretar as probabilidades (ou chances) correspondentes na tabela:
+Assim sendo, uma outra maneira de ler as estimativas do modelo é interpretar as probabilidades (ou chances) correspondentes na tabela:
 
 ```{r}
 round(fixos.m, 3)
@@ -372,62 +401,6 @@ Ao fazer isso, o que vemos é que o resultado, ao se mudar de 'plural' para 'sin
 Esse gráfico mostra bem, ainda, o que um modelo de regressão faz ao expor as 'estimativas'. Se não há interação, o efeito de 'singular' (aumento de 20$\%$) é o mesmo tanto em 'todo_um' quanto em 'um_todo'. Esse pensamento é difícil para quem vem de um paradigma mental típico da Análise de Variância (Anova), que pensa sempre em contrastes de todas as categorias contra todas as categorias, como se faz em um teste \emph{post-hoc}. O modelo de regressão contrasta apenas o que for estritamente necessário, não contrastando o que for redundante. Se, por exemplo, temos 3 categorias (A, B e C), ele apenas fará dois contrastes, porque o terceiro é inferível desses dois. Um exemplo pode deixar isso mais claro: se sabemos que Pedro é 5 anos mais velho do que João e que Maria é 2 anos mais velha do que Pedro, então não precisamos calcular a diferença de idade entre João e Maria, pois podemos inferi-la dos contrastes já dados. 
 
 No caso de 4 condições nos dados com que estamos trabalhando, ao fixar uma delas no intercepto, o modelo precisa apenas contrastar duas delas e estimar a interação para ter tudo o que é necessário. Se não há interação, o efeito do número obtido do contraste de duas condições é o mesmo para o contraste entre as demais (e o modelo não precisa perder tempo calculando esse valor). Se há interação, então o efeito efeito do número obtido do contraste de duas condições não é o mesmo para as demais e o modelo está mostrando nas estimativas o contraste individual entre elas.
-
-# Ajustando um modelo com priors informativas (ou nem tanto)
-
-Antes de tudo, o que são 'priors'? Uma prior é qualquer informação \emph{a priori} que temos sobre um fenômeno, que pode vir de conhecimento teórico sobre o assunto ou de dados de experimentos prévios sobre este tema. Por exemplo, se alguém nos faz uma pergunta sobre se a altura das pessoas aumenta com a idade, nós diríamos que 'sim', pelo menos até certa idade. Se alguém nos pergunta se a relação de aumento por ano é de 5cm ou de 5m, certamente diríamos que está mais próxima de 5cm do que de 5m. Logo, ao ajustar um modelo bayesiano, podemos incluir essas informações, de modo que o modelo não olhe para os dados de modo 'ingênuo' e nos venha com uma estimativa de que a cada ano as pessoas crescem 5m, por exemplo. Veja mais sobre o tema \href{https://vasishth.github.io/bayescogsci/book/sec-sensitivity.html#flat-uninformative-priors}{neste capítulo}.
-
-Em primeiro lugar, se você quiser, pode investigar as priors possíveis para cada parâmetro do modelo a ser aplicado a seus dados:
-
-```{r}
-get_prior(answer ~ Ordem*Num + (1+Ordem*Num|subj)+(1+Ordem*Num|item),
-          data = dados,
-          family = cumulative(link = "logit", threshold = "flexible"))
-```
-
-Em se tratando dos fatores fixos, o que este resultado nos mostra é que podemos definir priors para os coeficientes ou betas ($\beta$), marcados com a letra 'b' no resultado acima (temos 4 destes: uma para 'ordem', um para 'número', um para a 'interação' entre eles e um para a condição de referência, não nomeada); e priors para os 'interceptos' que, neste caso, são os 'tau cuts', ou seja, o valor que separa cada uma das categorias de sua adjacente ('neutro' de 'concordo'; 'concordo' de 'concordo totalmente' e assim por diante, aqui nomeadas como 'vazio', 1, 2, 3 e 4). 
-
-Apenas a título de ilustração, vamos setar priors para este modelo e ver o que muda nos resultados:
-
-```{r, message=FALSE, warning=FALSE}
-prior_manual <-
-  # Assume distribuição normal com média 0 e desvio padrão 5 para todos os
-  # coeficientes estimados (b de beta)
-  prior(normal(0, 5), class = "b") +
-  # Assume distribuição normal com média 0 e desvio padrão 5 para os interceptos
-  # (nesse caso tau cuts)
-  prior(normal(0, 5), class = "Intercept")
-
-# Vamos garantir que o programa use toda a nossa capacidade de computação para acelerar o
-# processo usando todos os núcleos do nosso processador
-options(mc.cores = parallel::detectCores())
-
-m3 <- brm(answer ~ Ordem*Num + (1+Ordem*Num|subj)+(1+Ordem*Num|item),
-          data = dados,
-          family = cumulative(link = "logit", threshold = "flexible"),
-          prior = prior_manual,
-          sample_prior = "only", # Extrair amostras apenas das priors e não dos dados
-          silent = 2, refresh = 0) # Apenas para não dar avisos no arquivo .pdf 
-
-
-fixef(m3)[5:7,]
-```
-Observe que, como as minhas priors são completamente sem sentido, as estimativas do modelo também são loucas!!!
-
-E podemos verificar quão boas são nossas priors... Nesse caso, horríveis...
-```{r, fig.width=5, fig.height=3}
-# pp_check(m3, type = "bars", nsamples = 100)
-pp_check(m3, ndraws = 100)
-```
-Você poderia (e deveria, se tiver tais informações), definir as priors mais detalhadamente, por exemplo, para cada um dos \emph{slopes} ($\beta$) estimados, como abaixo:
-```{r}
-# Definindo prios mais detalhadamente
-prior_manual <-
-  prior(normal(1, 1), class = "b", coef = NumSG) +
-  prior(normal(1, 1), class = "b", coef = OrdemtodoMum) +
-  prior(normal(1, 1), class = "b", coef = OrdemtodoMum:NumSG) +
-  prior(normal(0, 1.5), class = "Intercept") 
-```
 
 # Investigando os dados do Mario
 
@@ -589,7 +562,7 @@ fixos.m<-fixef(ordinal_mario)[5:7,]
 colnames(fixos.m)<-c("Estimativas", "Est.Error", "lower", "upper")
 fixos.m<-as.data.frame(fixos.m)
 
-# Cálculo da razão de chance e das probabilidades
+# Cálculo da chance e das probabilidades
 fixos.m<-fixos.m %>%
   mutate(OddsRatio=exp(Estimativas)) %>%
   mutate(Probs=OddsRatio/(1 + OddsRatio)*100)
@@ -617,6 +590,31 @@ fixos.m %>%
   labs(y = "LogOdds", x = "") + 
   ggtitle("Intervalos de credibilidade (0.95)") +
   coord_flip()+theme_classic()
+```
+
+E também o gráfico com a distribuição...
+```{r, fig.width=5, fig.height=3}
+tibble(
+  fatores = c("Longa", "Singular", "Interação"),
+  mu = fixef(ordinal_mario)[5:7, 1], # Estimativas do modelo
+  ci = 1.96*fixef(ordinal_mario)[5:7, 2]) %>% # Erro padrão x 1.96 (ci = .95)
+  expand(nesting(fatores, mu, ci),
+         y = seq(from = -20, to = 20, by = .01)) %>%
+         mutate(d = dnorm(y, mu, ci)) %>%
+  ggplot(aes(x = y, y = d, fill = fatores)) +
+  geom_area(alpha = 0.4, position = "identity") +
+  geom_vline(xintercept = fixef(ordinal_mario)[1:4, 1], linetype = "dotted") +
+  scale_x_continuous(sec.axis = dup_axis(breaks = fixef(ordinal_mario)[1:4, 1] %>%
+                                           as.double(),
+                                         labels = parse(text = stringr::str_c("tau[", 1:4, "]")))) +
+  labs(y = "", x = "", fill = "") +
+  theme_bw() +
+  theme(axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_blank(),
+        plot.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank())
 ```
 
 ## Interpretando os resultados...
@@ -688,3 +686,8 @@ data.frame(.tamanho = c("curta", "curta", "longa", "longa"),
                      breaks = seq(from = 0, to = 1, by = .05))
 ```
 
+# Ajustando um modelo com priors informativas (ou nem tanto)
+
+\textbf{NOTA DO AUTOR:} Recomendo não discutirmos esses pontos agora. Acho que poderíamos nos aprofundar mais antes de avançarmos aqui. Comecei meus estudos pelas aulas disponíveis no Youtube do Prof. Shravan Vasishth. \href{https://www.youtube.com/watch?v=dhbdG3gXP14&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&ab_channel=ShravanVasishth}{A primeira aula} me parece fundamental para entender o que é uma função de verossimilhança (\emph{Likelihood function}). Relembrem também as aulas do Gilberto, em que ele trabalhou esse ponto com bastante atenção, dando vários exemplos. Sem esse conhecimento fica muito difícil avançar para \href{https://www.youtube.com/watch?v=V96A5T6dN6Y&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&index=2&ab_channel=ShravanVasishth}{a segunda aula}, em que ele discute a noção de priors, fundamentando os princípios matemáticos por trás dessa noção. Relembrem também a última aula do Gilberto, em que ele trabalhou a noção de priors, com um exemplo de uma moeda não viciada.
+
+Eu ainda estou estudano o assunto e podemos ter uma conversa informal sobre o tema no dia da apresentação.
