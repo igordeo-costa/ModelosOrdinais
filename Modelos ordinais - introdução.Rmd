@@ -1,5 +1,5 @@
 ---
-title: "Regressão ordinal - uma introdução"
+title: "Regressão ordinal bayesiana - uma introdução"
 author: "Igor Costa"
 date: "10/05/2022"
 output: pdf_document
@@ -18,8 +18,8 @@ Mais especificamente:
 
 Veja também: 
 
-- \href{https://vasishth.github.io/bayescogsci/book/}{Nicenboim, B., Schad, D. \& Vasishth, S. An Introduction to Bayesian Data Analysis for Cognitive Science.}
-- \href{https://bookdown.org/content/3686/ordinal-predicted-variable.html}{Cap. 23 - Ordinal Predicted Variable. In. Kurz, S. Doing Bayesian Data Analysis in brms and the tidyverse.}
+- \href{https://vasishth.github.io/bayescogsci/book/}{Nicenboim, B., Schad, D. \& Vasishth, S. \emph{An Introduction to Bayesian Data Analysis for Cognitive Science.}}
+- \href{https://bookdown.org/content/3686/ordinal-predicted-variable.html}{Cap. 23 - Ordinal Predicted Variable. In. Kurz, S. \emph{Doing Bayesian Data Analysis in brms and the tidyverse.}}
 
 Carregando os pacotes adequados
 ```{r, message=FALSE}
@@ -30,25 +30,21 @@ require(tidyr)
 require(scales)
 require(brms) # Esse o pacote para fazermos o modelo ordinal bayesiano
 require(sjPlot) # Fundamental para extrair os efeitos marginais (última etapa deste tutorial)
+require(tidybayes)
 ```
 
 # Carregamento e organização dos dados brutos
 Carregando os dados de um experimento com Escala Likert:
 ```{r}
 dados <-
-  read.csv("https://raw.githubusercontent.com/igordeo-costa/ModelosOrdinais/main/ScalaLikertCosta2022.csv")
+  read.csv("https://raw.githubusercontent.com/igordeo-costa/ModelosOrdinais/main/ScalaLikertCosta2022.csv",
+           stringsAsFactors = T)
 ```
 
-Transformando as variáveis de modo adequado
+Transformando demais as variáveis de modo adequado
 ```{r}
-dados$Ordem<-as.factor(dados$Ordem)
-dados$Num<-as.factor(dados$Num)
-dados$answer<-as.factor(dados$answer)
 dados$idade<-as.integer(dados$idade)
-dados$genero<-as.factor(dados$genero)
-dados$escolaridade<-as.factor(dados$escolaridade)
-dados$idioma<-as.factor(dados$idioma)
-dados$item<-as.factor(dados$item)
+dados$subj <- as.factor(dados$subj)
 ```
 
 Mudar os dados respostas para ordenados
@@ -259,21 +255,36 @@ fixos.m %>%
   coord_flip()+theme_classic()
 ``` 
 
-Uma outra forma de pensar sobre esse gráfico é olhar para a relação entre a distribuição das estimativas dos fatores fixos\footnote{Modelos bayesianos apresentam uma série de estimativas para os valores de sigma, de modo que aqui, apenas a título de ilustração, usamos o intervalo de confiança calculado a partir do Erro padrão como a variância da curva.} e os interceptos (tau-cuts $\tau$) estimados pelo modelo: 
-```{r, fig.width=5, fig.height=3}
-tibble(
+Uma outra forma de pensar sobre esse gráfico é olhar para a relação entre a distribuição das estimativas dos fatores fixos e os interceptos (tau-cuts $\tau$) estimados pelo modelo. A informação dada, no final, é a mesma do gráfico anterior, mas talvez fique mais claro o que aquele gráfico está mostrando.
+
+Primeiro, vamos extrair os desvios padrão e estimativas da posterior:
+```{r}
+(posterior.draws <- m2 %>%
+  spread_draws(`b_.*`, regex = TRUE) %>%
+  summarise_draws())
+```
+
+Em seguida, vamos 
+
+```{r, fig.width=7, fig.height=3}
+legend_pal <- c("#ABDDA4", "#FDAE61", "#D7191C")
+  
+data.frame(
   fatores = c("Todo_um", "Singular", "Interação"),
-  mu = fixef(m2)[5:7, 1], # Estimativas do modelo
-  ci = 1.96*fixef(m2)[5:7, 2]) %>% # Erro padrão x 1.96 (ci = .95)
-  expand(nesting(fatores, mu, ci),
-         y = seq(from = -5, to = 5, by = .01)) %>%
-         mutate(d = dnorm(y, mu, ci)) %>%
+  posterior.draws[5:7,2:4]) %>%
+  expand(nesting(fatores, mean, sd),
+         y = seq(from = -4, to = 4, by = 0.001)) %>%
+  mutate(d = dnorm(y, mean, sd)) %>%
   ggplot(aes(x = y, y = d, fill = fatores)) +
-  geom_area(alpha = 0.4, position = "identity") +
+  geom_density(stat = "identity", alpha = 0.5,
+               aes(color = fatores)) +
   geom_vline(xintercept = fixef(m2)[1:4, 1], linetype = "dotted") +
-  scale_x_continuous(sec.axis = dup_axis(breaks = fixef(m2)[1:4, 1] %>%
-                                           as.double(),
-                                         labels = parse(text = stringr::str_c("tau[", 1:4, "]")))) +
+  scale_x_continuous(
+    sec.axis = dup_axis(breaks = fixef(m2)[1:4, 1] %>%
+                          as.double(),
+                        labels = parse(text = stringr::str_c("tau[", 1:4, "]")))) +
+  scale_fill_manual(values = legend_pal, name = NULL) +
+  scale_color_manual(values = legend_pal, name = NULL) +
   labs(y = "", x = "", fill = "") +
   theme_bw() +
   theme(axis.ticks.y = element_blank(),
@@ -283,6 +294,7 @@ tibble(
         panel.grid.minor = element_blank(),
         panel.border = element_blank())
 ```
+
 
 ## Interpretando os resultados...
 
@@ -592,21 +604,33 @@ fixos.m %>%
   coord_flip()+theme_classic()
 ```
 
-E também o gráfico com a distribuição...
-```{r, fig.width=5, fig.height=3}
-tibble(
+E também o gráfico com a distribuição estimada da posterior para cada fator...
+
+```{r}
+(posterior.draws <- ordinal_mario %>%
+  spread_draws(`b_.*`, regex = TRUE) %>%
+  summarise_draws())
+```
+
+```{r, fig.width=7, fig.height=3}
+legend_pal <- c("#ABDDA4", "#FDAE61", "#D7191C")
+  
+data.frame(
   fatores = c("Longa", "Singular", "Interação"),
-  mu = fixef(ordinal_mario)[5:7, 1], # Estimativas do modelo
-  ci = 1.96*fixef(ordinal_mario)[5:7, 2]) %>% # Erro padrão x 1.96 (ci = .95)
-  expand(nesting(fatores, mu, ci),
-         y = seq(from = -20, to = 20, by = .01)) %>%
-         mutate(d = dnorm(y, mu, ci)) %>%
+  posterior.draws[5:7,2:4]) %>%
+  expand(nesting(fatores, mean, sd),
+         y = seq(from = -20, to = 20, by = 0.001)) %>%
+  mutate(d = dlogis(y, mean, sd)) %>% # PDF da distribuição logística
   ggplot(aes(x = y, y = d, fill = fatores)) +
-  geom_area(alpha = 0.4, position = "identity") +
+  geom_density(stat = "identity", alpha = 0.5,
+               aes(color = fatores)) +
   geom_vline(xintercept = fixef(ordinal_mario)[1:4, 1], linetype = "dotted") +
-  scale_x_continuous(sec.axis = dup_axis(breaks = fixef(ordinal_mario)[1:4, 1] %>%
-                                           as.double(),
-                                         labels = parse(text = stringr::str_c("tau[", 1:4, "]")))) +
+  scale_x_continuous(
+    sec.axis = dup_axis(breaks = fixef(ordinal_mario)[1:4, 1] %>%
+                          as.double(),
+                        labels = parse(text = stringr::str_c("tau[", 1:4, "]")))) +
+  scale_fill_manual(values = legend_pal, name = NULL) +
+  scale_color_manual(values = legend_pal, name = NULL) +
   labs(y = "", x = "", fill = "") +
   theme_bw() +
   theme(axis.ticks.y = element_blank(),
