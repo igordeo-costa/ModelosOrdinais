@@ -8,20 +8,14 @@ output: pdf_document
 Esse material pretende fazer uma breve introdução aos chamados modelos de regressão ordinais, ajustados a variáveis dependentes categórias ordinais, ou seja, em que a ordem dos elementos é importante (nível de escolaridade, respostas em escala do tipo Likert, etc). As discussões aqui feitas restringem-se ao campo da psicolinguística experimental.
 
 ## Recomendações de leitura:
-Gelman & Hill (2009). \emph{Data Analysis Using Regression and Multilevel/Hierarchical Models.}
 
-Mais especificamente:
+- Gelman & Hill (2009). \emph{Data Analysis Using Regression and Multilevel/Hierarchical Models.} Mais especificamente: Cap. 5 Logistic regression (p. 79-105); Cap. 6.5 Multinomial regression (119-123); Cap. 15.2 Ordered categorical regression: storable votes (331-332).
 
-- 6.5 Multinomial regression (119-123)
-- 15.2 Ordered categorical regression: storable votes (331-332).
-- 5 Logistic regression (p. 79-105).
+- \href{https://vasishth.github.io/bayescogsci/book/}{\color{teal}{Nicenboim, B., Schad, D. \& Vasishth, S. \emph{An Introduction to Bayesian Data Analysis for Cognitive Science.}}}
 
-Veja também: 
+- \href{https://bookdown.org/content/3686/ordinal-predicted-variable.html}{\color{teal}{Kurz, S. \emph{Doing Bayesian Data Analysis in brms and the tidyverse.}}} Mais especificamente: Cap. 23 - \emph{Ordinal Predicted Variable.}
 
-- \href{https://vasishth.github.io/bayescogsci/book/}{Nicenboim, B., Schad, D. \& Vasishth, S. \emph{An Introduction to Bayesian Data Analysis for Cognitive Science.}}
-- \href{https://bookdown.org/content/3686/ordinal-predicted-variable.html}{Cap. 23 - Ordinal Predicted Variable. In. Kurz, S. \emph{Doing Bayesian Data Analysis in brms and the tidyverse.}}
-
-Carregando os pacotes adequados
+## Carregando os pacotes adequados
 ```{r, message=FALSE}
 require(ggplot2)
 require(dplyr)
@@ -229,8 +223,10 @@ fixos.m<-as.data.frame(fixos.m)
 
 # Calcula da chance e das probabilidades correspondentes
 fixos.m<-fixos.m %>%
-  mutate(OddsRatio=exp(Estimativas)) %>%
-  mutate(Probs=OddsRatio/(1 + OddsRatio)*100)
+  mutate(Odds=exp(Estimativas)) %>%
+  mutate(Probs=if_else(Estimativas<0, # Se logOdds menor do que zero, então:
+                       (exp(Estimativas)/(1 + exp(Estimativas))-1)*100, # Probab. de descer na escala
+                       exp(Estimativas)/(1 + exp(Estimativas))*100)) # Probab. de subir na escala
 
 rownames(fixos.m)<-c("ORDEM: todo_um", "NÚMERO: singular", "INTERAÇÃO: ordem x número")
 
@@ -247,7 +243,7 @@ fixos.m %>%
                 position=position_dodge(.9))+
   geom_point(color="orange", size = 3)+
   geom_text(aes(label=round(Estimativas, 3)), vjust=-1)+
-  # ao mudar a ordem é preciso mudar aqui embaixo...
+  # Ao mudar a ordem é preciso mudar aqui embaixo...
   scale_x_discrete(labels=c("ORDEM: todo_um", "NÚMERO: Singular",
                             "INTERAÇÃO:\n\ntodo_um x singular")) +
   labs(y = "LogOdds", x = "") + 
@@ -264,7 +260,7 @@ Primeiro, vamos extrair os desvios padrão e estimativas da posterior:
   summarise_draws())
 ```
 
-Em seguida, vamos 
+Em seguida, vamos plotar um gráfico com alguns desses dados: 
 
 ```{r, fig.width=7, fig.height=3}
 legend_pal <- c("#ABDDA4", "#FDAE61", "#D7191C")
@@ -298,7 +294,7 @@ data.frame(
 
 ## Interpretando os resultados...
 
-A fim de entender os resultados, primeiro devemos lembrar os contrastes do modelo. Neste caso, estamos usando 'dummy code' (0 e 1), também chamado de 'treatment contrasts'. Não vamos entrar em detalhes aqui sobre outros tipos de contrastes. Para uma discussão introdutória, veja o excelente material disponível \href{https://vasishth.github.io/Freq_CogSci/ch-contr.html}{aqui}.
+A fim de entender os resultados, primeiro devemos lembrar os contrastes do modelo. Neste caso, estamos usando 'dummy code' (0 e 1), também chamado de 'treatment contrasts'. Não vamos entrar em detalhes aqui sobre outros tipos de contrastes. Para uma discussão introdutória, veja o excelente material disponível \href{https://vasishth.github.io/Freq_CogSci/ch-contr.html}{\color{teal}{aqui}}.
 
 ```{r}
 contrasts(dados$Num)
@@ -307,35 +303,66 @@ contrasts(dados$Ordem)
 
 As categorias codificadas com 0 (zero) formam a base, a referência contra as quais as demais serão contrastadas. Neste caso, um_todo (0) PL (0) é a categoria de referência. Logo, podemos entender assim as estimativas do modelo:
 
-- O preditor 'Ordem: todo_um' = -2.47 logOdds indica o contraste 'todo_um (1) PL (0)' $\times$ 'um_todo (0) PL (0)'. Ou seja, mantendo-se o número constante, o efeito da 'ordem': todo_um aumenta a probabilidade de se DESCER na escala, aumenta a probabilidade de se dar uma resposta mais abaixo na escala.
+- O preditor 'Ordem: todo_um' = -2.4 logOdds indica o contraste 'todo_um (1) PL (0)' $\times$ 'um_todo (0) PL (0)'. Ou seja, mantendo-se o número constante, o efeito da 'ordem': todo_um aumenta a probabilidade de se DESCER na escala, aumenta a probabilidade de se dar uma resposta mais abaixo na escala.
 
-- O preditor 'Número: singular' = +1.62 logOdds indica o contraste 'um_todo (0) SG (1)' x 'um_todo (0) PL (0)'. Ou seja, mantendo-se a ordem constante, o efeito do 'número': singular aumenta a probabilidade de se SUBIR na escala, aumenta a probabilidade de se dar uma resposta mais acima na escala.
+- O preditor 'Número: singular' = +1.6 logOdds indica o contraste 'um_todo (0) SG (1)' x 'um_todo (0) PL (0)'. Ou seja, mantendo-se a ordem constante, o efeito do 'número': singular aumenta a probabilidade de se SUBIR na escala, aumenta a probabilidade de se dar uma resposta mais acima na escala.
 
-- A interação 'Ordem x Número (todo_um singular)' = +1.66 logOdds indica que os níveis da variável 'Ordem' interagem com os níveis da variável 'Número', basicamente indicando que: o nível singular aumenta a probabilidade de SUBIR na escala com todo_um; o nível plural aumenta a probabilidade de DESCER na escala com todo_um.
+- A interação 'Ordem x Número (todo_um singular)' = +1.6 logOdds indica que os níveis da variável 'Ordem' interagem com os níveis da variável 'Número', basicamente indicando que: o nível singular aumenta a probabilidade de SUBIR na escala com todo_um; o nível plural aumenta a probabilidade de DESCER na escala com todo_um.
 
 \textbf{IMPORTANTE!}
 O fato de haver um efeito de interação aponta para olharmos com cuidado para os efeitos de Ordem e de Número. Se não houvesse interação, o efeito de um nível da variável seria o mesmo para ambos os níveis da outra, mas como há, os efeitos de 'ordem' e de 'número' indicam contrastes particulares. Ver explicação abaixo, se quiser saber mais sobre esse ponto.
 
-### Um adendo: de logOdds para Odds para probailidades
+### Adendo 1: de logOdds para Odds para probailidades
 
-Vamos começar com um vetor de probabilidades, de 0 a 1, portanto. E vamos transformá-lo em logaritmo da chance (LogOdds). É esse valor que o modelo com ```family = 'logit'``` nos dá.
+Vamos começar com um vetor de probabilidades (valores entre 0 a 1, portanto), e vamos transformá-lo em logaritmo da chance (LogOdds). É esse valor que o modelo com ```family = 'logit'``` nos dá. Em seguida, vamos converter os LogOdds em Odds (chance) e depois em probabilidades.
+
 ```{r}
-a = round(qlogis(c(0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1)), 2)
+a = c(0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1)
+log_a = round(qlogis(a), 2)
+odds = round(exp(log_a), 1)
+# Abaixo, o mesmo que 'boot::inv.logit(log_a)'
+backTo_a = round(exp(log_a)/(1+exp(log_a)), 2)
+tags = c("extreme", rep("border", 4), "center", rep("border", 4), "extreme")
 
-# Logaritmo da chance, ou logOdds
-print(a)
+(myOddsGraph <- data.frame(a, log_a, odds, backTo_a, tags))
 ```
 
-Agora vamos transformar esse valor em chance:
-```{r}
-# Odds ou chances
-round(exp(a), 1)
+A partir dessa tabela, temos o seguinte gráfico resumitivo:
+
+```{r, echo=FALSE, , fig.width=6, fig.height=3}
+myOddsGraph %>%
+  ggplot() +
+  geom_text(aes(x = 1, y = a, label = a, color = tags)) +
+  geom_text(aes(x = 2, y = a, label = log_a, color = tags)) +
+  geom_text(aes(x = 3, y = a, label = odds, color = tags)) +
+  geom_segment(aes(x = 1.2, xend = 1.8, y = 0.52, yend = 0.52),
+               arrow = arrow(length = unit(0.03, "npc")),
+               color = "gray") +
+  geom_text(aes(x = 1.5, y = 1/1.6, label = "qlogis(prob.)"),
+            color = "gray", size = 3) +
+  geom_segment(aes(x = 2.2, xend = 2.8, y = 1/2, yend = 1/2),
+               arrow = arrow(length = unit(0.03, "npc")),
+               color = "gray") +
+  geom_text(aes(x = 2.5, y = 1/1.6, label = "exp(logOdds)"),
+            color = "gray", size = 3) +
+  geom_segment(aes(x = 1.8, xend = 1.2, y = 0.48, yend = 0.48),
+               arrow = arrow(length = unit(0.03, "npc")),
+               color = "gray") +
+  geom_text(aes(x = 1.5, y = 0.26, label = "exp(logOdds)/(1+exp(logOdds))"),
+            color = "gray", size = 3) +
+  scale_x_continuous(labels = c("Probabilidades", "LogOdds", "Odds", "Probabilidades"),
+                   breaks = seq(from = 1, to = 4, by = 1)) +
+  scale_color_brewer(palette = "Set1", name = NULL) +
+  labs(x = "", y = "") +
+  theme_classic() +
+  theme(legend.position = 'none',
+        axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  coord_flip()
 ```
-E, por fim, vamos retornar às probabilidades:
-```{r}
-# Retornando às probabilidades
-round(exp(a)/(1+exp(a)), 2)
-```
+
 
 Olhando com atenção para esses dados, o que percebemos é que:
 
@@ -343,7 +370,7 @@ Olhando com atenção para esses dados, o que percebemos é que:
 
 - Probabilidade de 80$\%$ é igual a 1.39 logOdds que é igual a chance de 4/1 (4 chances de sucesso para uma de fracasso);
 
-- Probabilidade de 10$\%$ é igual a -2.20 logOdds que é igual a chance de 0.1 ou 1/10 (1 chance de sucesso para 10 de fracasso).
+- Probabilidade de 10$\%$ é igual a -2.2 logOdds que é igual a chance de 0.1 ou 1/10 (1 chance de sucesso para 10 de fracasso).
 
 Mas por que usar logOdds se fica tão difícil de compreender? O motivo é que probabilidade é um valor limitado entre 0 e 1 enquanto LogOdds é um valor que vai de -Inf a +Inf:
 ```{r}
@@ -359,11 +386,11 @@ Assim sendo, uma outra maneira de ler as estimativas do modelo é interpretar as
 round(fixos.m, 3)
 ```
 
-Ao se mudar de uma frase com a ordem 'um_todo' para uma frase com a ordem 'todo_um', há cerca de 7$\%$ de probabilidade (0.08 ou 1 chance para 12) de a resposta ser 1 nível abaixo na escala. Por exemplo, se as pessoas em geral marcam 'concordo' em uma frase com 'um_todo', há 7$\%$ de chance de elas marcarem abaixo, ou seja, 'neutro', em uma frase com 'todo_um'. Apesar de ser uma probabilidade pequena, ela foi significativa.
+Ao se mudar de uma frase com a ordem 'um_todo' para uma frase com a ordem 'todo_um', há cerca de 92$\%$ de probabilidade de a resposta ser 1 nível abaixo na escala (0.08 ou 1 chance para SUBIR e 12 para DESCER). Por exemplo, se as pessoas em geral marcam 'concordo' em uma frase com 'um_todo', há 92$\%$ de probabilidade de elas marcarem abaixo, ou seja, 'neutro', em uma frase com 'todo_um'.
 
-Se as pessoas em geral marcam 'concordo' em uma frase com 'plural', há 83$\%$ de probailidade (ou 5 chances para 1) de elas marcarem acima, ou seja, 'concordo totalmente' em uma frase com anáfora 'singular'. \emph{Grosso modo}, é isso que o modelo está dizendo.
+Se as pessoas em geral marcam 'concordo' em uma frase com 'plural', há 83$\%$ de probailidade (ou 5 chances para SUBIR e 1 para DESCER) de elas marcarem acima, ou seja, 'concordo totalmente' em uma frase com anáfora 'singular'. \emph{Grosso modo}, é isso que o modelo está dizendo.
 
-## Um adendo para explicar o efeito de interação
+## Adendo 2: entendendo o efeito de interação
 
 Observe o gráfico abaixo, cujos valores foram inventados, apenas para ilustração:
 
@@ -414,13 +441,26 @@ Esse gráfico mostra bem, ainda, o que um modelo de regressão faz ao expor as '
 
 No caso de 4 condições nos dados com que estamos trabalhando, ao fixar uma delas no intercepto, o modelo precisa apenas contrastar duas delas e estimar a interação para ter tudo o que é necessário. Se não há interação, o efeito do número obtido do contraste de duas condições é o mesmo para o contraste entre as demais (e o modelo não precisa perder tempo calculando esse valor). Se há interação, então o efeito efeito do número obtido do contraste de duas condições não é o mesmo para as demais e o modelo está mostrando nas estimativas o contraste individual entre elas.
 
+### Interpretando os resultados à luz da teoria
+
+| Frase: O(a) estilista mostrou...         |Anáfora                  | Ordem     | Número    |
+|------------------------------------------|-------------------------|-----------|-----------|  
+| uma camisa para todo comprador que [...],| mas \textbf{ela} não... | Um_todo   | Singular  |
+| uma camisa para todo comprador que [...],| mas \textbf{elas} não...| Um_todo   | Plural    |
+| toda camisa que [...] para um comprador, | mas \textbf{ele} não... | Todo_um   | Singular  |
+| toda camisa que [...] para um comprador, | mas \textbf{eles} não...| Todo_um   | Plural    |
+
+- Sentenças duplamente quantificadas com anáfora singular são aceitas pelos falantes de Português Brasileiro se comparadas com sentenças com anáfora plural (maior porcentagem de julgamentos concordo totalmente e concordo) - Efeito de NÚMERO Singular do modelo: 83$\%$;
+
+- No que diz respeito à ordem dos quantificadores, os resultados indicam que sentenças com a ordem todo_um não são aceitas pelos falantes de português - Efeito de ORDEM: Todo_um: -92$\%$. Este efeito, contudo, foi modulado pela interação, mostrando que se mantém para a condição Todo_um $\times$ Plural, mas não para Todo_um $\times$ Singular - Efeito de INTERAÇÃO: Todo_um $\times$ Singular: 84$\%$.
+
 # Investigando os dados do Mario
 
 Carregando os dados e fazendo as alterações na tabela:
 ```{r}
-final_table <-
-  read.csv("https://raw.githubusercontent.com/igordeo-costa/ModelosOrdinais/main/AnaliseEscalaLikert_Mario.csv",
-           stringsAsFactors = T)
+final_table <- read.csv(
+  "https://raw.githubusercontent.com/igordeo-costa/ModelosOrdinais/main/AnaliseEscalaLikert_Mario.csv",
+  stringsAsFactors = T)
 
 # Preparando a tabela
 final_table$escala <- as.ordered(final_table$escala) # variável resposta ordenada
@@ -538,13 +578,6 @@ geom_text(data = meio_alto,
   ggtitle("")
 ```
 
-Exemplos de sentenças usadas pelo autor e suas categorizações respectivas:
-
-- No escritório da firma desapareceu um documento sigiloso. (curta_sg)
-- No escritório da firma desapareceu uns documentos sigilosos. (curta_pl)
-- No canteiro do jardim desabrochou \textbf{repentinamente} uma azaleia belíssima. (longa_sg)
-- No canteiro do jardim desabrochou \textbf{repentinamente} umas azaleias belíssimas. (longa_pl)
-
 ## Aplicando um modelo ordinal aos dados usando 'Flat priors'
 
 ```{r, message=FALSE, warning=FALSE}
@@ -576,8 +609,10 @@ fixos.m<-as.data.frame(fixos.m)
 
 # Cálculo da chance e das probabilidades
 fixos.m<-fixos.m %>%
-  mutate(OddsRatio=exp(Estimativas)) %>%
-  mutate(Probs=OddsRatio/(1 + OddsRatio)*100)
+  mutate(Odds=exp(Estimativas)) %>%
+  mutate(Probs=if_else(Estimativas<0, # Se logOdds menor do que zero, então:
+                       (exp(Estimativas)/(1 + exp(Estimativas))-1)*100, # Probab. de descer na escala
+                       exp(Estimativas)/(1 + exp(Estimativas))*100)) # Probab. de subir na escala
 
 rownames(fixos.m)<-c("TAMANHO: longa", "NÚMERO: singular", "INTERAÇÃO: longa x sg")
 
@@ -620,7 +655,7 @@ data.frame(
   posterior.draws[5:7,2:4]) %>%
   expand(nesting(fatores, mean, sd),
          y = seq(from = -20, to = 20, by = 0.001)) %>%
-  mutate(d = dlogis(y, mean, sd)) %>% # PDF da distribuição logística
+  mutate(d = dnorm(y, mean, sd)) %>% # PDF da distribuição normal
   ggplot(aes(x = y, y = d, fill = fatores)) +
   geom_density(stat = "identity", alpha = 0.5,
                aes(color = fatores)) +
@@ -654,6 +689,8 @@ contrasts(final_table$Número)
 - O efeito não significativo de tamanho indica que nada se pode inferir quanto ao tamanho. O intervalo de credibilidade cortando a linha do zero indica que o parâmetro populacional pode tanto ser menor quanto maior do que zero... ou mesmo zero. Mantendo-se o plural constante, ao se mudar de longa para curta, não se pode inferir que há diferença.
 
 - O intervalo de credibilidade para a interação ora corta a linha do zero ora não. Apenas por motivos pedagógicos, vamos assumir que ele seja significativo. Se é assim, então o nível singular aumenta MUITO a probabilidade de SUBIR na escala com curta e aumenta POUCO ou NADA com longa. Mas por que o valor em logOdds é negativo (-3 logOdds)? Como falamos antes, o resultado da interação é sempre o mesmo, o que muda é apenas o sinal.
+
+\textbf{IMPORTANTE!} Em uma abordagem bayesiana, em geral estamos mais preocupados com a estimativa do modelo e com o grau de confiança que temos nela e menos preocupados de essa estimativa ser ou não significativa, ou seja, menos preocupados com o fato de o intervalo de credibilidade conter ou não zero (Ver a \href{https://www.youtube.com/watch?v=UzoNYDrZnrk&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&index=4&ab_channel=ShravanVasishth}{\color{teal}{aula 03 do Prof. Shravan Vasishth}}, mais especificamente a partir de 2h27min13seg).
 
 ### De novo um adendo para compreender a interação...
 Vamos olhar para o gráfico abaixo:
@@ -710,8 +747,24 @@ data.frame(.tamanho = c("curta", "curta", "longa", "longa"),
                      breaks = seq(from = 0, to = 1, by = .05))
 ```
 
+### Interpretando os resultados à luz da teoria
+A partir de agora, o autor pode interpretar os resultados em vista das suas considerações teóricas, olhando para os contrastes que planejou, suas sentenças e categorizações respectivas:
+
+| Frase                                                                                 | Tamanho | Número    |
+|---------------------------------------------------------------------------------------|---------|-----------|  
+| No escritório da firma desapareceu um documento sigiloso.                             | Curta   | Singular  |
+| No escritório da firma desapareceu uns documentos sigilosos.                          | Curta   | Plural    |
+| No canteiro do jardim desabrochou \textbf{repentinamente} uma azaleia belíssima.      | Longa   | Singular  |
+| No canteiro do jardim desabrochou \textbf{repentinamente} umas azaleias belíssimas.   | Longa   | Plural    |
+
+- O singular aumenta a probabilidade de respostas ACIMA na escala, indicando que os falantes aceitam mais as sentenças com número singular do que com número plural - Efeito de NÚMERO: Singular: 99$\%$;
+
+- Esse efeito, porém, foi modulado pela interação: enquanto o plural tem o mesmo efeito nos falantes, independentemente do TAMANHO (efeito não significativo de TAMANHO: Longa), o singular é mais aceito com curtas do que com longas: Efeito de INTERAÇÃO: Longa $\times$ Singular: -96$\%$.
+
 # Ajustando um modelo com priors informativas (ou nem tanto)
 
-\textbf{NOTA DO AUTOR:} Recomendo não discutirmos esses pontos agora. Acho que poderíamos nos aprofundar mais antes de avançarmos aqui. Comecei meus estudos pelas aulas disponíveis no Youtube do Prof. Shravan Vasishth. \href{https://www.youtube.com/watch?v=dhbdG3gXP14&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&ab_channel=ShravanVasishth}{A primeira aula} me parece fundamental para entender o que é uma função de verossimilhança (\emph{Likelihood function}). Relembrem também as aulas do Gilberto, em que ele trabalhou esse ponto com bastante atenção, dando vários exemplos. Sem esse conhecimento fica muito difícil avançar para \href{https://www.youtube.com/watch?v=V96A5T6dN6Y&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&index=2&ab_channel=ShravanVasishth}{a segunda aula}, em que ele discute a noção de priors, fundamentando os princípios matemáticos por trás dessa noção. Relembrem também a última aula do Gilberto, em que ele trabalhou a noção de priors, com um exemplo de uma moeda não viciada.
+\textbf{NOTA DO AUTOR:} Recomendo não discutirmos esses pontos agora. Acho que poderíamos nos aprofundar mais antes de avançarmos aqui. Comecei meus estudos pelas aulas disponíveis no Youtube do Prof. Shravan Vasishth. \href{https://www.youtube.com/watch?v=dhbdG3gXP14&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&ab_channel=ShravanVasishth}{\color{teal}{A primeira aula}} me parece fundamental para entender o que é uma função de verossimilhança (\emph{Likelihood function}). Relembrem também as aulas do Gilberto, em que ele trabalhou esse ponto com bastante atenção, dando vários exemplos. Sem esse conhecimento fica muito difícil avançar para \href{https://www.youtube.com/watch?v=V96A5T6dN6Y&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&index=2&ab_channel=ShravanVasishth}{\color{teal}{a segunda aula}}, em que ele discute a noção de priors, fundamentando os princípios matemáticos por trás dessa noção. Relembrem também a última aula do Gilberto, em que ele trabalhou a noção de priors, com um exemplo de uma moeda não viciada. Da \href{https://www.youtube.com/watch?v=UzoNYDrZnrk&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&index=3&ab_channel=ShravanVasishth}{\color{teal}{terceira aula}}, eu tirei a citação abaixo (1h38min08seg) que justifica o fato de, por enquanto, podermos ficar com esse modelo mais simples, sem priors tão informativas:
+
+> In general, we don't want our priors to have too much influence on our posterior. This is unless we have \emph{very} good reasons for having informative priors, such as very small sample and/or a lot of prior information; an exemple would be if we have data from an impaired population, which makes it hard to increase our sample size. 
 
 Eu ainda estou estudano o assunto e podemos ter uma conversa informal sobre o tema no dia da apresentação.
