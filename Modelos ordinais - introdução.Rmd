@@ -1,13 +1,15 @@
 ---
 title: "Regressão ordinal bayesiana - uma introdução"
 author: "Igor Costa"
-date: "10/05/2022"
+date: "18/05/2022"
 output: pdf_document
 ---
 # Motivação
-Esse material pretende fazer uma breve introdução aos chamados modelos de regressão ordinais, ajustados a variáveis dependentes categórias ordinais, ou seja, em que a ordem dos elementos é importante (nível de escolaridade, respostas em escala do tipo Likert, etc). As discussões aqui feitas restringem-se ao campo da psicolinguística experimental.
+Esse material pretende fazer uma breve introdução aos chamados modelos de regressão ordinais, ajustados a variáveis dependentes categórias ordinais, ou seja, em que a ordem dos elementos é importante (nível de escolaridade, respostas em escala do tipo Likert, etc). As discussões aqui feitas restringem-se ao campo da psicolinguística experimental e são parte dos encontros dos membros do \href{https://www.lapal.letras.puc-rio.br/}{\color{teal}{Laboratório de Psicolinguística e Aquisição da Linguagem - LAPAL/PUC-Rio.}}
 
 ## Recomendações de leitura:
+
+- \href{https://www.researchgate.net/publication/354291639_Analysis_of_rating_scales_A_pervasive_problem_in_bilingualism_research_and_a_solution_with_Bayesian_ordinal_models}{\color{teal}{Veríssimo, João (2021). \emph{Analysis of rating scales: A pervasive problem in bilingualism research and a solution with Bayesian ordinal models.}}}
 
 - Gelman & Hill (2009). \emph{Data Analysis Using Regression and Multilevel/Hierarchical Models.} Mais especificamente: Cap. 5 Logistic regression (p. 79-105); Cap. 6.5 Multinomial regression (119-123); Cap. 15.2 Ordered categorical regression: storable votes (331-332).
 
@@ -319,7 +321,7 @@ Vamos começar com um vetor de probabilidades (valores entre 0 a 1, portanto), e
 ```{r}
 a = c(0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1)
 log_a = round(qlogis(a), 2)
-odds = round(exp(log_a), 1)
+odds = round(exp(log_a), 2)
 # Abaixo, o mesmo que 'boot::inv.logit(log_a)'
 backTo_a = round(exp(log_a)/(1+exp(log_a)), 2)
 tags = c("extreme", rep("border", 4), "center", rep("border", 4), "extreme")
@@ -370,7 +372,7 @@ Olhando com atenção para esses dados, o que percebemos é que:
 
 - Probabilidade de 80$\%$ é igual a 1.39 logOdds que é igual a chance de 4/1 (4 chances de sucesso para uma de fracasso);
 
-- Probabilidade de 10$\%$ é igual a -2.2 logOdds que é igual a chance de 0.1 ou 1/10 (1 chance de sucesso para 10 de fracasso).
+- Probabilidade de 10$\%$ é igual a -2.2 logOdds que é igual a chance de 0.11 ou 1/9 (1 chance de sucesso para 9 de fracasso). A fim de converter probabilidade em Odds, basta dividir a probabilidade de sucesso pela de fracasso. Por exemplo: $\frac{0.1}{0.9} = 0.11$ ou $\frac{0.2}{0.8} = 0.25$ (uma probabilidade de $20\%$ de sucesso é o mesmo que uma chance de $0.25$ ou 1/4 - uma chance de sucesso para 4 de fracasso.)
 
 Mas por que usar logOdds se fica tão difícil de compreender? O motivo é que probabilidade é um valor limitado entre 0 e 1 enquanto LogOdds é um valor que vai de -Inf a +Inf:
 ```{r}
@@ -763,8 +765,12 @@ A partir de agora, o autor pode interpretar os resultados em vista das suas cons
 
 # Ajustando um modelo com priors informativas (ou nem tanto)
 
-\textbf{NOTA DO AUTOR:} Recomendo não discutirmos esses pontos agora. Acho que poderíamos nos aprofundar mais antes de avançarmos aqui. Comecei meus estudos pelas aulas disponíveis no Youtube do Prof. Shravan Vasishth. \href{https://www.youtube.com/watch?v=dhbdG3gXP14&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&ab_channel=ShravanVasishth}{\color{teal}{A primeira aula}} me parece fundamental para entender o que é uma função de verossimilhança (\emph{Likelihood function}). Relembrem também as aulas do Gilberto, em que ele trabalhou esse ponto com bastante atenção, dando vários exemplos. Sem esse conhecimento fica muito difícil avançar para \href{https://www.youtube.com/watch?v=V96A5T6dN6Y&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&index=2&ab_channel=ShravanVasishth}{\color{teal}{a segunda aula}}, em que ele discute a noção de priors, fundamentando os princípios matemáticos por trás dessa noção. Relembrem também a última aula do Gilberto, em que ele trabalhou a noção de priors, com um exemplo de uma moeda não viciada. Da \href{https://www.youtube.com/watch?v=UzoNYDrZnrk&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&index=3&ab_channel=ShravanVasishth}{\color{teal}{terceira aula}}, eu tirei a citação abaixo (1h38min08seg) que justifica o fato de, por enquanto, podermos ficar com esse modelo mais simples, sem priors tão informativas:
+\textbf{NOTA DO AUTOR:} Recomendo não discutirmos esses pontos agora. Acho que poderíamos nos aprofundar mais antes de avançarmos aqui. Comecei meus estudos pelas aulas disponíveis no Youtube do Prof. Shravan Vasishth. \href{https://www.youtube.com/watch?v=dhbdG3gXP14&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&ab_channel=ShravanVasishth}{\color{teal}{A primeira aula}} me parece fundamental para entender o que é uma função de verossimilhança (\emph{Likelihood function}). Relembrem também as \href{https://ead.puc-rio.br/pluginfile.php/1432396/mod_resource/content/1/Slides%20Est%20LAPAL.pdf}{\color{teal}{aulas do Gilberto}}, em que ele trabalhou esse ponto com bastante atenção, dando vários exemplos. Sem esse conhecimento fica muito difícil avançar para \href{https://www.youtube.com/watch?v=V96A5T6dN6Y&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&index=2&ab_channel=ShravanVasishth}{\color{teal}{a segunda aula}}, em que ele discute a noção de priors, fundamentando os princípios matemáticos por trás dessa noção. Relembrem também a última aula do Gilberto, em que ele trabalhou a noção de priors, com um exemplo de uma moeda não viciada. Da \href{https://www.youtube.com/watch?v=UzoNYDrZnrk&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&index=3&ab_channel=ShravanVasishth}{\color{teal}{terceira aula}}, eu tirei a citação abaixo (1h38min08seg) que justifica o fato de, por enquanto, podermos ficar com esse modelo mais simples, sem priors tão informativas:
 
-> In general, we don't want our priors to have too much influence on our posterior. This is unless we have \emph{very} good reasons for having informative priors, such as very small sample and/or a lot of prior information; an exemple would be if we have data from an impaired population, which makes it hard to increase our sample size. 
+> In general, we don't want our priors to have too much influence on our posterior. This is unless we have \emph{very} good reasons for having informative priors, such as very small sample and/or a lot of prior information; an exemple would be if we have data from an impaired population, which makes it hard to increase our sample size.
 
-Eu ainda estou estudano o assunto e podemos ter uma conversa informal sobre o tema no dia da apresentação.
+\href{https://www.youtube.com/watch?v=T1gYvX5c2sM&ab_channel=Generable}{\color{teal}{Andrew Gelman (1h14min)}} parece ter uma postura semelhante:
+
+> In my analysis I'll typically - maybe beacause of my trainning as statistician - start with a super weak prior and hope It works and if It doens't I'll start putting prior information in.
+
+Eu ainda estou estudando o assunto e podemos ter uma conversa informal sobre o tema no dia da apresentação.
