@@ -214,15 +214,13 @@ isREML(mod_cheio)
 
 # A noção de priors
 
-\textbf{IMPORTANTE!} Muito do que está aqui eu tirei das aulas do prof. Shravan Vasishth e algumas coisas do curso do Gilberto. Vamos dar os créditos a quem de fato entende do assunto.
+Voltemos ao nosso experimento com verbos do tipo A e a produção de plural. Vamos supor que eu esteja trabalhando com uma população de crianças com \emph{Déficit Específico da Linguagem} - DEL e que haja muita informação na área indicando que essas crianças, devido a suas dificuldades com marcas de concordância, na verdade produzem tais marcas aleatoriamente, ora colocando a marca no verbo ora não colocando (imagine que elas estejam "chutando" aleatoriamente)\footnote{Muito do que está aqui eu tirei da \href{https://www.youtube.com/watch?v=dhbdG3gXP14&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&ab_channel=ShravanVasishth}{\color{teal}{aula 1}} e \href{https://www.youtube.com/watch?v=V96A5T6dN6Y&list=PLz_LbfBra_0cvj0zYDGDCLK7CnZ1GGF3j&index=2&ab_channel=ShravanVasishth}{\color{teal}{da aula 2}} do prof. Shravan Vasishth e dessa \href{https://www.youtube.com/watch?v=bFZ-0FH5hfs&t=3526s&ab_channel=MITOpenCourseWare}{\color{teal}{aula do prof. Philippe Rigollet}}.}.
 
-Voltemos ao nosso experimento com verbos do tipo A e a produção de plural. Vamos supor que eu esteja trabalhando com uma população de crianças com \emph{Déficit Específico da Linguagem} - DEL e que haja muita informação na área indicando que essas crianças, devido a suas dificuldades com marcas de concordância, na verdade produzem tais marcas aleatoriamente, ora colocando a marca no verbo ora não colocando (imagine que elas estejam "chutando" aleatoriamente).
-
-Se estamos seguros de que é isso o que de fato ocorre, então podemos especular sobre a distribuição de probabilidades da produção dessas crianças \emph{antes} mesmo de realizarmos o experimento. Vamos usar a distribuição beta para isso.
+Se estamos seguros de que é isso o que de fato ocorre, então podemos especular sobre a distribuição de probabilidades da produção dessas crianças \emph{antes} mesmo de realizarmos o experimento. Vamos usar a distribuição beta para isso, visto que ela, como a binomial, tem valores que se distribuem entre $0$ e $1$ - e também porque o exemplo com ela simplesmente espantoso de simples! 
 
 Como sabemos, a distribuição beta tem dois parâmetros, $a$ e $b$ e o núcleo da sua fórmula é dado por:
 
-$\theta^{a-1}(1-\theta)^{b-1}$
+$Beta(a, b) = constante \times \theta^{a-1}(1-\theta)^{b-1}$
 
 No R, podemos calcular a densidade de probabilidades da distribuição beta para cada um dos valores entre $0$ e $1$ apenas acrescentando um vetor com tais valores e os parâmetros correspondentes. Vamos olhar para alguns deles:
 
@@ -248,7 +246,7 @@ legend_pal <- c("#ABDDA4", "#D7191C", "#FDAE61")
 beta_data %>%
   ggplot(aes(x = x, y = Valores, color = dist)) +
   geom_density(stat = "identity", alpha = 0.5) +
-  scale_color_brewer(palette = "Set1", name = NULL,
+  scale_color_brewer(palette = "Spectral", name = NULL,
                      labels = c("Beta(5,5)", "Beta(60,60)", "Beta(30,30)", "Beta(15,15)")) +
   labs(x = "", y = "") +
   theme_classic() +
@@ -266,25 +264,45 @@ Então concluímos o primeiro passo: definimos uma prior: Beta(30, 30), que nos 
 
 O segundo passo será realizar o experimento. Imaginemos então que tenhamos realizado a tarefa descrita anteriormente e que conseguimos das 20 instâncias de verbos do tipo A, 15 plurais. Como já vimos, a estimativa de máxima verossimilhaça da distribuição binomial nos dá $75\%$ de probabilidade.
 
-O nosso terceiro passo, então, é multiplicar o núcleo da minha likelihood pelo núcleo da minha prior (Não se assuste com a conta abaixo! Sério! Ela é muito simples, basta você se lembrar de que, na multiplicação de bases iguais, repete-se a base e somam-se os expoentes: $a^{2} \times a^{5} = a^{2 + 5} = a^{7}$).
+É aqui que entra o Teorema de Bayes:
+
+$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$
+
+Vamos reescrevê-lo à luz do nosso problema:
+
+$P(\theta|dados) = \frac{P(dados|\theta)P(\theta)}{P(dados)}$
+
+- $P(\theta|dados)$: é uma probabilidade condicional, indicando a probabilidade de encontrarmos o verdadeiro parâmetro populacional $\theta$ dadas as informações (os dados) que temos; essa é a chamada \emph{distribuição posterior}.
+
+- $P(dados|\theta)$: é também uma probabilidade condicional, indicando a probabilidade de observarmos dados como esses que encontramos, dado que o parâmetro é verdadeiro; essa, na verdade, é a definição de \emph{Likelihood};
+
+- $P(\theta)$: essa é a probabilidade de o parâmetro ser verdadeiro, independente de quaisquer condições; pense bem, essa é a nossa informação \emph{a priori} sobre o parâmetro, a distribuição que estamos aqui chamando de \emph{prior}.
+
+- $P(dados)$: essa é a probabilidade dos dados, basicamente, a sua distribuição. Mais uma vez, vamos ignorar esse valor por enquanto, pois ele não será influente aqui. Veja a \href{https://www.youtube.com/watch?v=bFZ-0FH5hfs&t=3526s&ab_channel=MITOpenCourseWare}{\color{teal}{aula do prof. Philippe Rigollet, 36min30}}, se quiser se aprofundar no tema. 
+
+O que o Teorema de Bayes nos dá, portanto, é que a \emph{posterior} é o produto da \emph{likelihood} e da \emph{prior}. No nosso caso, a multiplicação da nossa binomial pela nossa beta:
 
 $$
 \begin{aligned}
-Bin(k|n, \theta) \times Beta (a, b) = \\ [\theta^{k}(1-\theta)^{n-k}] \times [\theta^{a-1}(1-\theta)^{b-1}] = \\ [\theta^{k} \theta^{(a-1)}] \times [(1-\theta)^{(n-k)} (1-\theta)^{(a-1)}] = \\ [\theta^{k + (a -1)}]\times[(1-\theta)^{(n-k)+(b-1)}] 
+P(\theta|dados) = & P(dados|\theta)P(\theta) \\= & Bin(k|n, \theta) \times Beta (a, b)
+\end{aligned}
+$$
+
+O nosso terceiro passo, então, é multiplicar o núcleo da nossa likelihood pelo núcleo da nossa prior (Não se assuste com a conta abaixo! Sério! Ela é muito simples, basta você se lembrar de que, na multiplicação de bases iguais, repete-se a base e somam-se os expoentes: $a^{2} \times a^{5} = a^{2 + 5} = a^{7}$).
+
+$$
+\begin{aligned}
+Likelihood \times Prior & = Bin(k|n, \theta) \times Beta (a, b) \\ & = [\theta^{k}(1-\theta)^{n-k}] \times [\theta^{a-1}(1-\theta)^{b-1}] \\ & = [\theta^{k} \theta^{(a-1)}] \times [(1-\theta)^{(n-k)} (1-\theta)^{(a-1)}] \\ & = [\theta^{k + (a -1)}]\times[(1-\theta)^{(n-k)+(b-1)}] \\ & = \theta^{k + a -1}(1-\theta)^{n-k+b-1} 
 \end{aligned}
 $$
 
 Lembre-se da fórmula da distribuição beta:
 
-$\theta^{a-1}(1-\theta)^{b-1}$
+$Beta(a, b) = constante \times \theta^{a-1}(1-\theta)^{b-1}$
 
-E compare com o resultado da multiplicação feita acima, que vamos apenas rescrever abaixo: 
+E compare com o resultado da multiplicação feita acima, que vamos apenas reescrever como $\theta^{[k + a] -1}(1-\theta)^{[n-k+b]-1}$. Vamos chamar os elementos entre colchetes acima de $a^* = k + a$ e $b^* = n -k +b$ e reescrever esse resultado assim:
 
-$\theta^{[k + a] -1}(1-\theta)^{[n-k+b]-1}$
-
-Vamos chamar os elementos entre colchetes acima de $a^* = k + a$ e $b^* = n -k +b$ e reescrever esse resultado assim:
-
-$\theta^{a^* -1}(1-\theta)^{b^*-1}$
+$Beta(a^*, b^*) = constante \times \theta^{a^* -1}(1-\theta)^{b^*-1}$
 
 O resultado da multiplicação da distribuição binomial (nossa \emph{Likelihood}) pela beta (nossa \emph{prior}) é uma nova distribuição beta com parâmetros $a^*$ e $b^*$, ou seja: $Beta(k + a, n-k +b)$. Essa a nossa \emph{posterior}, que tem o mesmo formato da nossa \emph{prior}, mas que é modulada pelos dados, ou seja, pela \emph{Likelihood}. Em outras palavras, a posterior é uma nova distribuição que é influenciada tanto pelos dados quanto pela informação prévia que tínhamos sobre o fenômeno em questão.
 
@@ -424,7 +442,8 @@ analysis <- data.frame(x, likelihood, prior, posterior) %>%
 
 max_v <- analysis %>%
   group_by(dist) %>%
-  filter(Valores == max(Valores))
+  filter(Valores == max(Valores)) %>%
+  filter(dist != "prior")
 
 legend_pal <- c("#ABDDA4", "#D7191C", "#FDAE61")
 
@@ -442,5 +461,5 @@ analysis %>%
   ggtitle("Relação entre distribuições\n")
 ```
 
-Se isso ocorre, a \emph{Likelihood} domina completamente e não temos qualquer influência da prior na análise dos nossos dados. Neste caso, estamos em situação idêntica ao frequentismo!
+Como mostra o gráfico, nossa \emph{prior} é absolutamente não informativa. Ela simplesmente diz que todos os valores entre $0$ e $1$ são igualmente possíveis, sendo, portanto, uma distribuição uniforme. Se isso ocorre, a \emph{Likelihood} domina completamente e não temos qualquer influência da prior na análise dos nossos dados. Neste caso, estamos em situação idêntica ao frequentismo! O que temos é um modelo integralmente dominado pela \emph{Likelihood}.
  
